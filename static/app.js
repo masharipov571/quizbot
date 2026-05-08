@@ -19,11 +19,12 @@ const app = {
         try {
             const nameEl = document.getElementById('userNameDisplay');
             if (nameEl) nameEl.textContent = this.user.first_name.toUpperCase();
-            this.checkAdminStatus();
+        } catch (e) { console.error("Name display error:", e); }
+        
+        // Admin statusini tekshirish, lekin uni kutib o'tirmasdan menyuni ochish
+        this.checkAdminStatus().finally(() => {
             this.showView('mainMenu');
-        } catch (e) {
-            console.error("Init error:", e);
-        }
+        });
     },
 
     async checkAdminStatus() {
