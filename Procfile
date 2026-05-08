@@ -1,1 +1,1 @@
-web: playwright install chromium && python main.py
+web: playwright install chromium && python migrate.py && python main.py
