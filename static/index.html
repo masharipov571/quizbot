@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TSUE Quiz Bot</title>
+    <title>TSUE Multi-Bot</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -14,35 +14,41 @@
             <div class="welcome-section">
                 <div class="welcome-text">
                     <p>Xush kelibsiz,</p>
-                    <h1 id="userNameDisplay">FOYDALANUVCHI</h1>
+                    <h1 id="userNameDisplay">YUKLANMOQDA...</h1>
                 </div>
                 <img src="https://cdn-icons-png.flaticon.com/512/3074/3074058.png" class="illustration" alt="Study">
             </div>
 
-            <h3 style="margin-bottom: 16px; font-size: 1.1rem;">Dashboard</h3>
+            <h3 style="margin-bottom: 16px;">Multi-Function Dashboard</h3>
             <div class="menu-grid">
                 <div class="menu-card" onclick="app.showView('createQuizView')">
-                    <div class="icon-box" style="background: #7c3aed;">📖</div>
+                    <div class="icon-box" style="background: #7c3aed; color:white;">📖</div>
                     <span class="menu-title">Quiz Yaratish</span>
-                    <span class="menu-desc">Yangi testlar va viktorinalar yarating</span>
+                    <span class="menu-desc">Yangi testlar yarating</span>
                     <span class="arrow-icon">→</span>
                 </div>
                 <div class="menu-card" onclick="app.showView('joinQuizView')">
-                    <div class="icon-box" style="background: #fbbf24;">🎓</div>
+                    <div class="icon-box" style="background: #fbbf24; color:white;">🎓</div>
                     <span class="menu-title">Qo'shilish</span>
-                    <span class="menu-desc">Sinov va tadbirlarga qo'shiling</span>
+                    <span class="menu-desc">Testlarni ishlash</span>
                     <span class="arrow-icon">→</span>
                 </div>
                 <div class="menu-card" onclick="app.showView('resultsView'); app.loadResults();">
-                    <div class="icon-box" style="background: #10b981;">📈</div>
+                    <div class="icon-box" style="background: #10b981; color:white;">📈</div>
                     <span class="menu-title">Natijalar</span>
-                    <span class="menu-desc">Test va imtihon natijalarini ko'ring</span>
+                    <span class="menu-desc">O'z natijalaringizni ko'ring</span>
+                    <span class="arrow-icon">→</span>
+                </div>
+                <div class="menu-card" onclick="app.closeToBot('Dars jadvalini bot menyusi orqali olishingiz mumkin!')">
+                    <div class="icon-box" style="background: #ef4444; color:white;">📅</div>
+                    <span class="menu-title">Dars Jadvali</span>
+                    <span class="menu-desc">Bot orqali ko'rish</span>
                     <span class="arrow-icon">→</span>
                 </div>
                 <div id="adminBtn" class="menu-card" style="display: none;" onclick="app.showView('adminView'); app.loadAdminPanel();">
-                    <div class="icon-box" style="background: #3b82f6;">👤</div>
+                    <div class="icon-box" style="background: #3b82f6; color:white;">👤</div>
                     <span class="menu-title">Admin Panel</span>
-                    <span class="menu-desc">Tizimni boshqarish va sozlash</span>
+                    <span class="menu-desc">Tizimni boshqarish</span>
                     <span class="arrow-icon">→</span>
                 </div>
             </div>
@@ -56,7 +62,6 @@
                 <p style="font-size:0.8rem; color:var(--text-dim);">ChatGPT uchun promptdan nusxa oling va JSON faylni yuklang.</p>
                 <button class="btn-primary" style="width:100%; padding:12px;" onclick="app.copyPrompt()">Promptdan nusxa olish</button>
             </div>
-            
             <div class="welcome-section" style="flex-direction:column; gap:16px;">
                 <input type="number" id="timerInput" value="30" placeholder="Vaqt (sekund)">
                 <input type="file" id="quizJsonFile" accept=".json">
@@ -85,8 +90,8 @@
             <div class="q-progress-bg"><div id="qProgressBar" class="q-progress-fill" style="width: 0%"></div></div>
             <div id="questionsContainer"></div>
             <div class="nav-btns">
-                <button class="btn-secondary" id="prevBtn" onclick="app.prevQuestion()">Oldingi</button>
-                <button class="btn-primary" id="nextBtn" onclick="app.nextQuestion()">Keyingi →</button>
+                <button class="btn-secondary" onclick="app.prevQuestion()">Oldingi</button>
+                <button class="btn-primary" onclick="app.nextQuestion()">Keyingi →</button>
             </div>
         </div>
 
@@ -99,7 +104,7 @@
                 <div class="stat-card"><span class="val" id="stWrong" style="color:var(--danger);">0</span><span class="lbl">Xato</span></div>
             </div>
             <div class="result-main-card">
-                <div class="progress-circle" id="avgCircle" style="--p: 0%" data-text="0%"></div>
+                <div class="progress-circle" id="avgCircle" data-text="0%"></div>
                 <div>
                     <p style="font-size:0.75rem; color:var(--text-dim);">O'rtacha natija</p>
                     <h3 id="avgText">Yaxshi</h3>
@@ -109,20 +114,20 @@
             <div id="resultsContainer"></div>
         </div>
 
-        <!-- Success Result View (Quiz tugaganda) -->
+        <!-- Success Result View -->
         <div id="quizResultView" class="view" style="text-align:center;">
              <div class="welcome-section" style="flex-direction:column; padding:40px 20px;">
                 <span style="font-size:4rem;">🏆</span>
                 <h2 style="margin-top:16px;">Test Yakunlandi!</h2>
-                <div id="finalScoreDisplay" style="font-size:1.5rem; font-weight:800; color:var(--primary); margin:12px 0;">32%</div>
-                <button class="btn-primary" style="width:100%;" onclick="app.showView('mainMenu')">Doshbordga qaytish</button>
+                <div id="finalScoreDisplay" style="font-size:1.5rem; font-weight:800; color:var(--primary); margin:12px 0;">0%</div>
+                <button class="btn-primary" style="width:100%;" onclick="app.showView('mainMenu')">Doshbordga Qaytish</button>
              </div>
         </div>
 
         <!-- Admin View -->
         <div id="adminView" class="view">
             <div onclick="app.showView('mainMenu')" style="cursor:pointer; margin-bottom:20px; font-weight:700; color:var(--text-dim);">← Orqaga</div>
-            <h3>Admin Panel</h3>
+            <h3>🛠 Admin Paneli</h3>
             <div id="adminContainer"></div>
         </div>
     </div>

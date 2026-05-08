@@ -1,69 +1,112 @@
-import asyncio
-import logging
 import os
-from aiogram import Bot, Dispatcher, types
+import asyncio
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from sqlalchemy.future import select
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, WebAppInfo, FSInputFile
+from sqlalchemy.orm import Session
+from database import SessionLocal, init_db
+from models import User, Subscription
+from timetable_engine import get_timetable_screenshot
 
-from database import engine, Base, AsyncSessionLocal
-import models
+TOKEN = os.getenv("BOT_TOKEN")
+WEBAPP_URL = os.getenv("WEBAPP_URL")
 
-# Environment variables
-API_TOKEN = os.getenv('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
-WEBAPP_URL = os.getenv('WEBAPP_URL', 'https://your-app.railway.app')
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-bot = Bot(token=API_TOKEN)
+bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-async def get_or_create_user(telegram_id: int, first_name: str, username: str):
-    async with AsyncSessionLocal() as session:
-        try:
-            result = await session.execute(select(models.User).where(models.User.telegram_id == telegram_id))
-            user = result.scalars().first()
-            if not user:
-                user = models.User(
-                    telegram_id=telegram_id, 
-                    first_name=first_name, 
-                    username=username
-                )
-                session.add(user)
-                await session.commit()
-            else:
-                # Malumotlarni yangilab qo'yamiz
-                user.first_name = first_name
-                user.username = username
-                await session.commit()
-            return user
-        except Exception as e:
-            logger.error(f"User yaratishda xato: {e}")
-            return None
+class Form(StatesGroup):
+    waiting_for_group = State()
+    waiting_for_sub_group = State()
+    waiting_for_time = State()
+
+def get_main_kb():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📚 Quiz (WebApp)", web_app=WebAppInfo(url=WEBAPP_URL))],
+            [KeyboardButton(text="📅 Dars Jadvali"), KeyboardButton(text="🔔 Obuna Bo'lish")],
+            [KeyboardButton(text="📊 Mening Natijalarim", web_app=WebAppInfo(url=f"{WEBAPP_URL}#resultsView"))]
+        ],
+        resize_keyboard=True
+    )
 
 @dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    await get_or_create_user(
-        message.from_user.id, 
-        message.from_user.first_name, 
-        message.from_user.username
-    )
-    
-    markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎓 O'quv Yordamchisi", web_app=WebAppInfo(url=WEBAPP_URL))]
-    ])
+async def start(message: types.Message):
+    db: Session = SessionLocal()
+    user = db.query(User).filter(User.telegram_id == message.from_user.id).first()
+    if not user:
+        user = User(
+            telegram_id=message.from_user.id,
+            first_name=message.from_user.first_name,
+            username=message.from_user.username
+        )
+        db.add(user)
+        db.commit()
+    db.close()
     
     await message.answer(
-        f"Salom, {message.from_user.first_name}! 👋\n\n"
-        "Men sizning intellektual o'quv yordamchingizman. "
-        "Quyidagi tugmani bosib tizimga kiring:",
-        reply_markup=markup
+        f"Assalomu alaykum, {message.from_user.first_name}! \nTSUE Study Assistant botiga xush kelibsiz.",
+        reply_markup=get_main_kb()
     )
 
-async def start_bot():
-    logger.info("Bot ishga tushmoqda...")
-    await dp.start_polling(bot)
+# --- Dars Jadvali ---
+@dp.message(F.text == "📅 Dars Jadvali")
+async def ask_group(message: types.Message, state: FSMContext):
+    await message.answer("Guruh nomini kiriting (masalan: II-53/24):")
+    await state.set_state(Form.waiting_for_group)
 
-if __name__ == "__main__":
-    asyncio.run(start_bot())
+@dp.message(Form.waiting_for_group)
+async def send_timetable(message: types.Message, state: FSMContext):
+    group = message.text.strip()
+    await message.answer(f"Xo'sh, {group} guruhi uchun jadvalni tayyorlayapman... ⏳")
+    
+    screenshot_path = await get_timetable_screenshot(group)
+    if screenshot_path and os.path.exists(screenshot_path):
+        await message.answer_photo(
+            photo=FSInputFile(screenshot_path),
+            caption=f"📅 {group} guruhi uchun dars jadvali"
+        )
+        os.remove(screenshot_path) # Tozalash
+    else:
+        await message.answer("Kechirasiz, jadvalni topib bo'lmadi. Guruh nomini to'g'ri kiritganingizni tekshiring.")
+    
+    await state.clear()
+
+# --- Obuna Bo'lish ---
+@dp.message(F.text == "🔔 Obuna Bo'lish")
+async def sub_ask_group(message: types.Message, state: FSMContext):
+    await message.answer("Obuna bo'lish uchun guruh nomini kiriting:")
+    await state.set_state(Form.waiting_for_sub_group)
+
+@dp.message(Form.waiting_for_sub_group)
+async def sub_ask_time(message: types.Message, state: FSMContext):
+    await state.update_data(group=message.text.strip())
+    await message.answer("Har kuni dars jadvali soat nechada kelsin? (Masalan: 08:00)")
+    await state.set_state(Form.waiting_for_time)
+
+@dp.message(Form.waiting_for_time)
+async def save_sub(message: types.Message, state: FSMContext):
+    time = message.text.strip()
+    data = await state.get_data()
+    group = data['group']
+    
+    db: Session = SessionLocal()
+    user = db.query(User).filter(User.telegram_id == message.from_user.id).first()
+    if user:
+        sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
+        if sub:
+            sub.group_name = group
+            sub.notification_time = time
+        else:
+            sub = Subscription(user_id=user.id, group_name=group, notification_time=time)
+            db.add(sub)
+        db.commit()
+    db.close()
+    
+    await message.answer(f"Muvaffaqiyatli! Endi har kuni soat {time} da sizga {group} guruhi jadvali yuboriladi.")
+    await state.clear()
+
+async def run_bot():
+    init_db()
+    await dp.start_polling(bot)

@@ -1,26 +1,24 @@
 import os
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-# Railway Volume yoki Mahalliy bazani tanlash
-db_path = "./quiz_bot.db"
-if os.path.exists("/data"):
-    db_path = "/data/quiz_bot.db"
+# Railway Persistent Volume yo'li
+DB_PATH = "/data/quiz_bot.db" if os.path.exists("/data") else "./quiz_bot.db"
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 
-DB_URL = os.getenv("DATABASE_URL", f"sqlite+aiosqlite:///{db_path}")
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Engine konfiguratsiyasi
-if DB_URL.startswith("sqlite"):
-    engine = create_async_engine(DB_URL, echo=False)
-else:
-    engine = create_async_engine(DB_URL, echo=False, pool_size=20, max_overflow=10)
-
-AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 Base = declarative_base()
 
-async def get_db():
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def init_db():
+    import models
+    Base.metadata.create_all(bind=engine)

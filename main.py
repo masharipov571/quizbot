@@ -1,46 +1,38 @@
 import asyncio
-import logging
 import os
 import uvicorn
-from api import app
-from bot import dp, bot, engine, Base
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from api import router as api_router
+from bot import run_bot
+from scheduler import check_and_send_notifications
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+app = FastAPI()
 
-async def run_bot():
-    # Ma'lumotlar bazasini tekshirish/yaratish
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    logger.info("Bot polling rejimi boshlanmoqda...")
-    await dp.start_polling(bot)
+# Static fayllarni ulash
+if not os.path.exists("static"):
+    os.makedirs("static")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-async def main():
-    # Railway taqdim etadigan PORT
-    port = int(os.getenv("PORT", "8000"))
-    
-    # Uvicorn server konfiguratsiyasi
-    config = uvicorn.Config(
-        app, 
-        host="0.0.0.0", 
-        port=port, 
-        log_level="info",
-        proxy_headers=True,
-        forwarded_allow_ips="*"
-    )
+# API routerini ulash
+app.include_router(api_router, prefix="/api")
+
+@app.get("/")
+async def serve_index():
+    from fastapi.responses import FileResponse
+    return FileResponse("static/index.html")
+
+async def start_all():
+    # Bot, Server va Scheduler'ni birga ishga tushirish
+    config = uvicorn.Config(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
     server = uvicorn.Server(config)
     
-    logger.info(f"Server {port}-portda ishga tushmoqda...")
-    
-    # Ikkala jarayonni parallel yurgizish
+    # Hammasini parallel ishga tushirish
     await asyncio.gather(
         server.serve(),
-        run_bot()
+        run_bot(),
+        check_and_send_notifications()
     )
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("Dastur to'xtatildi.")
+    asyncio.run(start_all())

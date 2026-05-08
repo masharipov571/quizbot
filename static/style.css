@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-    --primary: #7c3aed; /* Binafsha */
+    --primary: #7c3aed;
     --primary-light: #f5f3ff;
     --secondary: #fbbf24;
     --success: #10b981;
@@ -41,7 +41,7 @@ h1, h2, h3 { font-family: 'Outfit', sans-serif; }
 .welcome-text h1 { font-size: 1.4rem; font-weight: 800; color: #0f172a; margin-top: 4px; }
 .welcome-text p { font-size: 0.85rem; color: var(--text-dim); }
 
-.illustration { width: 80px; height: 80px; }
+.illustration { width: 80px; height: 80px; object-fit: contain; }
 
 .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
@@ -94,7 +94,7 @@ h1, h2, h3 { font-family: 'Outfit', sans-serif; }
     width: 70px;
     height: 70px;
     border-radius: 50%;
-    background: conic-gradient(var(--primary) var(--p), #f1f5f9 0);
+    background: conic-gradient(var(--primary) var(--p, 0%), #f1f5f9 0);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -116,7 +116,7 @@ h1, h2, h3 { font-family: 'Outfit', sans-serif; }
     color: var(--primary);
 }
 
-/* List Items */
+/* History List */
 .history-item {
     background: white;
     padding: 14px 16px;
@@ -184,3 +184,14 @@ h1, h2, h3 { font-family: 'Outfit', sans-serif; }
 .view { display: none; animation: fadeIn 0.3s ease; }
 .view.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+input {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: 2px solid #f1f5f9;
+    font-family: inherit;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+input:focus { outline: none; border-color: var(--primary); }
